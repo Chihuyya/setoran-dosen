@@ -107,23 +107,53 @@ const App = () => {
   const [searchFocused, setSearchFocused] = useState(false);
 
   // --- Fetch Mahasiswa Bimbingan ---
+  const fetchMahasiswaBimbingan = async () => {
+    if (!token) return;
+    setLoadingBimbingan(true);
+    try {
+      const res = await api.getMahasiswaBimbingan(token);
+      console.log("[DEBUG] Response dari /dosen/pa-saya:", res);
+
+      // Coba handle berbagai format respons API
+      let list = null;
+      if (res.response === true && Array.isArray(res.data)) {
+        list = res.data;
+      } else if (Array.isArray(res.data)) {
+        list = res.data;
+      } else if (Array.isArray(res)) {
+        list = res;
+      } else if (res.response === true && res.data && Array.isArray(res.data.mahasiswa)) {
+        list = res.data.mahasiswa;
+      } else if (res.mahasiswa && Array.isArray(res.mahasiswa)) {
+        list = res.mahasiswa;
+      } else if (res.response === true && res.data && Array.isArray(res.data.list)) {
+        list = res.data.list;
+      } else if (res.list && Array.isArray(res.list)) {
+        list = res.list;
+      } else if (res.response === true && res.data && typeof res.data === 'object') {
+        // Jika data adalah object, coba ambil values pertama yang array
+        const firstArray = Object.values(res.data).find(v => Array.isArray(v));
+        if (firstArray) list = firstArray;
+      }
+
+      if (list && Array.isArray(list)) {
+        setMahasiswaBimbingan(list);
+        console.log("[DEBUG] Data mahasiswa bimbingan dimuat:", list.length, "item");
+      } else {
+        console.warn("[DEBUG] Format respons tidak dikenali:", res);
+        setMahasiswaBimbingan([]);
+      }
+    } catch (err) {
+      console.error("[DEBUG] Error fetch mahasiswa bimbingan:", err);
+      setMahasiswaBimbingan([]);
+    } finally {
+      setLoadingBimbingan(false);
+    }
+  };
+
   useEffect(() => {
     if (activeTab === 'data' && token) {
-      setLoadingBimbingan(true);
-      api.getMahasiswaBimbingan(token)
-        .then((res) => {
-          if (res.response && Array.isArray(res.data)) {
-            setMahasiswaBimbingan(res.data);
-          } else {
-            setMahasiswaBimbingan([]);
-          }
-        })
-        .catch(() => {
-          setMahasiswaBimbingan([]);
-        })
-        .finally(() => {
-          setLoadingBimbingan(false);
-        });
+      fetchMahasiswaBimbingan();
     }
   }, [activeTab, token]);
 
@@ -540,8 +570,18 @@ const App = () => {
                       <h2 className="text-3xl font-black text-slate-900">Mahasiswa Bimbingan</h2>
                       <p className="text-slate-400 mt-2 font-medium">Dosen Pembimbing: <span className="text-indigo-600 font-black">Pak Fikri</span></p>
                     </div>
-                    <div className="bg-indigo-50 text-indigo-600 px-6 py-3 rounded-2xl font-black text-sm">
-                      Total: {mahasiswaBimbingan.length} Mahasiswa
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={fetchMahasiswaBimbingan}
+                        disabled={loadingBimbingan}
+                        className="bg-white text-indigo-600 border border-indigo-200 px-4 py-3 rounded-2xl font-bold text-sm hover:bg-indigo-50 transition-all disabled:opacity-50 flex items-center gap-2"
+                      >
+                        <Clock className={loadingBimbingan ? 'animate-spin' : ''} size={16} />
+                        Refresh
+                      </button>
+                      <div className="bg-indigo-50 text-indigo-600 px-6 py-3 rounded-2xl font-black text-sm">
+                        Total: {mahasiswaBimbingan.length} Mahasiswa
+                      </div>
                     </div>
                   </div>
 
