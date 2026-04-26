@@ -107,6 +107,8 @@ const App = () => {
   const [searchFocused, setSearchFocused] = useState(false);
 
   // --- Fetch Mahasiswa Bimbingan ---
+  const [dosenInfo, setDosenInfo] = useState({ nama: "Pak Fikri", email: "", nip: "" });
+
   const fetchMahasiswaBimbingan = async () => {
     if (!token) return;
     setLoadingBimbingan(true);
@@ -114,24 +116,30 @@ const App = () => {
       const res = await api.getMahasiswaBimbingan(token);
       console.log("[DEBUG] Response dari /dosen/pa-saya:", res);
 
-      // Coba handle berbagai format respons API
       let list = null;
-      if (res.response === true && Array.isArray(res.data)) {
-        list = res.data;
-      } else if (Array.isArray(res.data)) {
+
+      // Format API PA-Saya: res.data.info_mahasiswa_pa.daftar_mahasiswa
+      if (res.response === true && res.data?.info_mahasiswa_pa?.daftar_mahasiswa) {
+        list = res.data.info_mahasiswa_pa.daftar_mahasiswa;
+        // Simpan info dosen juga
+        if (res.data.nama) {
+          setDosenInfo({
+            nama: res.data.nama,
+            email: res.data.email || "",
+            nip: res.data.nip || "",
+          });
+        }
+      }
+      // Fallbacks untuk format lain
+      else if (Array.isArray(res.data)) {
         list = res.data;
       } else if (Array.isArray(res)) {
         list = res;
-      } else if (res.response === true && res.data && Array.isArray(res.data.mahasiswa)) {
+      } else if (res.data?.mahasiswa && Array.isArray(res.data.mahasiswa)) {
         list = res.data.mahasiswa;
-      } else if (res.mahasiswa && Array.isArray(res.mahasiswa)) {
-        list = res.mahasiswa;
-      } else if (res.response === true && res.data && Array.isArray(res.data.list)) {
+      } else if (res.data?.list && Array.isArray(res.data.list)) {
         list = res.data.list;
-      } else if (res.list && Array.isArray(res.list)) {
-        list = res.list;
-      } else if (res.response === true && res.data && typeof res.data === 'object') {
-        // Jika data adalah object, coba ambil values pertama yang array
+      } else if (res.data && typeof res.data === 'object') {
         const firstArray = Object.values(res.data).find(v => Array.isArray(v));
         if (firstArray) list = firstArray;
       }
@@ -568,7 +576,7 @@ const App = () => {
                   <div className="flex items-center justify-between mb-10">
                     <div>
                       <h2 className="text-3xl font-black text-slate-900">Mahasiswa Bimbingan</h2>
-                      <p className="text-slate-400 mt-2 font-medium">Dosen Pembimbing: <span className="text-indigo-600 font-black">Pak Fikri</span></p>
+                      <p className="text-slate-400 mt-2 font-medium">Dosen Pembimbing: <span className="text-indigo-600 font-black">{dosenInfo.nama}</span></p>
                     </div>
                     <div className="flex items-center gap-3">
                       <button
@@ -600,30 +608,37 @@ const App = () => {
                   )}
 
                   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                    {mahasiswaBimbingan.map((mhs) => {
-                      const percent = Math.round((mhs.progres / mhs.total) * 100);
+                    {mahasiswaBimbingan.map((mhs, idx) => {
+                      // Handle berbagai format field dari API
+                      const nimMhs = mhs.nim || mhs.npm || mhs.nim_mhs || mhs.id || idx + 1;
+                      const namaMhs = mhs.nama || mhs.nm_mhs || mhs.name || mhs.nama_mahasiswa || "Mahasiswa";
+                      const semesterMhs = mhs.semester || mhs.smt || mhs.sem || "-";
+                      const progresMhs = mhs.progres || mhs.jumlah_setoran || mhs.total_setoran || mhs.setoran_count || 0;
+                      const totalMhs = mhs.total || mhs.total_target || mhs.target || 30;
+                      const percent = totalMhs > 0 ? Math.round((progresMhs / totalMhs) * 100) : 0;
+                      
                       return (
                         <div
-                          key={mhs.nim}
+                          key={nimMhs}
                           className="bg-slate-50 rounded-[2rem] p-6 border border-slate-100 hover:border-indigo-200 hover:shadow-lg hover:shadow-indigo-100/50 transition-all duration-300 group cursor-pointer"
-                          onClick={() => { setNim(mhs.nim); handleGetData(); }}
+                          onClick={() => { setNim(String(nimMhs)); handleGetData(); }}
                         >
                           <div className="flex items-start justify-between mb-4">
                             <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center text-indigo-600 font-black text-xl shadow-sm border border-slate-100 group-hover:scale-110 transition-transform">
-                              {mhs.nama.charAt(0)}
+                              {namaMhs.charAt(0)}
                             </div>
                             <span className={`text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest ${percent >= 80 ? 'bg-emerald-100 text-emerald-600' : percent >= 50 ? 'bg-amber-100 text-amber-600' : 'bg-rose-100 text-rose-600'}`}>
                               {percent >= 80 ? 'Baik' : percent >= 50 ? 'Sedang' : 'Perlu Perhatian'}
                             </span>
                           </div>
 
-                          <h3 className="font-black text-lg text-slate-900 mb-1">{mhs.nama}</h3>
-                          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">NIM {mhs.nim} • Semester {mhs.semester}</p>
+                          <h3 className="font-black text-lg text-slate-900 mb-1">{namaMhs}</h3>
+                          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">NIM {nimMhs} • Semester {semesterMhs}</p>
 
                           <div className="space-y-2">
                             <div className="flex items-center justify-between text-xs font-bold">
                               <span className="text-slate-500">Progres Hafalan</span>
-                              <span className="text-indigo-600">{mhs.progres}/{mhs.total}</span>
+                              <span className="text-indigo-600">{progresMhs}/{totalMhs}</span>
                             </div>
                             <div className="h-3 bg-white rounded-full overflow-hidden border border-slate-100">
                               <div
