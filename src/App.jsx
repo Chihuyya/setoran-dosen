@@ -81,7 +81,7 @@ const api = {
   },
 
   getMahasiswaBimbingan: async (token) => {
-    const response = await fetch(`${BASE_URL}/dosen/bimbingan`, {
+    const response = await fetch(`${BASE_URL}/dosen/pa-saya`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     return response.json();
