@@ -78,23 +78,15 @@ const api = {
       body: JSON.stringify(data),
     });
     return res.json();
+  },
+
+  getMahasiswaBimbingan: async (token) => {
+    const response = await fetch(`${BASE_URL}/dosen/bimbingan`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return response.json();
   }
 };
-
-const MAHASISWA_BIMBINGAN = [
-  { nim: "210401001", nama: "Ahmad Fauzi", semester: 5, progres: 12, total: 30 },
-  { nim: "210401002", nama: "Budi Santoso", semester: 5, progres: 18, total: 30 },
-  { nim: "210401003", nama: "Citra Dewi", semester: 5, progres: 24, total: 30 },
-  { nim: "210401004", nama: "Dedi Pratama", semester: 5, progres: 8, total: 30 },
-  { nim: "210401005", nama: "Eka Sari", semester: 5, progres: 20, total: 30 },
-  { nim: "210401006", nama: "Fajar Nugroho", semester: 5, progres: 15, total: 30 },
-  { nim: "210401007", nama: "Gita Anggraini", semester: 5, progres: 27, total: 30 },
-  { nim: "210401008", nama: "Hadi Wijaya", semester: 5, progres: 10, total: 30 },
-  { nim: "210401009", nama: "Indah Permata", semester: 5, progres: 22, total: 30 },
-  { nim: "210401010", nama: "Joko Susilo", semester: 5, progres: 14, total: 30 },
-  { nim: "210401011", nama: "Kartika Sari", semester: 5, progres: 19, total: 30 },
-  { nim: "210401012", nama: "Lukman Hakim", semester: 5, progres: 6, total: 30 },
-];
 
 const App = () => {
   // --- Auth & Data State ---
@@ -105,12 +97,35 @@ const App = () => {
   const [selectedSurah, setSelectedSurah] = useState([]);
   const [nim, setNim] = useState("");
   const [notif, setNotif] = useState(null);
+  const [mahasiswaBimbingan, setMahasiswaBimbingan] = useState([]);
+  const [loadingBimbingan, setLoadingBimbingan] = useState(false);
   const notifTimer = useRef(null);
 
   // --- UI State ---
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isLoading, setIsLoading] = useState(false);
   const [searchFocused, setSearchFocused] = useState(false);
+
+  // --- Fetch Mahasiswa Bimbingan ---
+  useEffect(() => {
+    if (activeTab === 'data' && token) {
+      setLoadingBimbingan(true);
+      api.getMahasiswaBimbingan(token)
+        .then((res) => {
+          if (res.response && Array.isArray(res.data)) {
+            setMahasiswaBimbingan(res.data);
+          } else {
+            setMahasiswaBimbingan([]);
+          }
+        })
+        .catch(() => {
+          setMahasiswaBimbingan([]);
+        })
+        .finally(() => {
+          setLoadingBimbingan(false);
+        });
+    }
+  }, [activeTab, token]);
 
   // --- Notification Logic ---
   const showNotif = (type, message) => {
@@ -526,12 +541,26 @@ const App = () => {
                       <p className="text-slate-400 mt-2 font-medium">Dosen Pembimbing: <span className="text-indigo-600 font-black">Pak Fikri</span></p>
                     </div>
                     <div className="bg-indigo-50 text-indigo-600 px-6 py-3 rounded-2xl font-black text-sm">
-                      Total: {MAHASISWA_BIMBINGAN.length} Mahasiswa
+                      Total: {mahasiswaBimbingan.length} Mahasiswa
                     </div>
                   </div>
 
+                  {loadingBimbingan && (
+                    <div className="flex items-center justify-center py-20">
+                      <Clock className="animate-spin text-indigo-500" size={32} />
+                      <span className="ml-3 text-slate-500 font-bold">Memuat data mahasiswa...</span>
+                    </div>
+                  )}
+
+                  {!loadingBimbingan && mahasiswaBimbingan.length === 0 && (
+                    <div className="text-center py-20">
+                      <Users size={48} className="text-slate-300 mx-auto mb-4" />
+                      <p className="text-slate-400 font-bold">Tidak ada data mahasiswa bimbingan</p>
+                    </div>
+                  )}
+
                   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                    {MAHASISWA_BIMBINGAN.map((mhs) => {
+                    {mahasiswaBimbingan.map((mhs) => {
                       const percent = Math.round((mhs.progres / mhs.total) * 100);
                       return (
                         <div
