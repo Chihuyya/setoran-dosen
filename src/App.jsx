@@ -81,6 +81,21 @@ const api = {
   }
 };
 
+const MAHASISWA_BIMBINGAN = [
+  { nim: "210401001", nama: "Ahmad Fauzi", semester: 5, progres: 12, total: 30 },
+  { nim: "210401002", nama: "Budi Santoso", semester: 5, progres: 18, total: 30 },
+  { nim: "210401003", nama: "Citra Dewi", semester: 5, progres: 24, total: 30 },
+  { nim: "210401004", nama: "Dedi Pratama", semester: 5, progres: 8, total: 30 },
+  { nim: "210401005", nama: "Eka Sari", semester: 5, progres: 20, total: 30 },
+  { nim: "210401006", nama: "Fajar Nugroho", semester: 5, progres: 15, total: 30 },
+  { nim: "210401007", nama: "Gita Anggraini", semester: 5, progres: 27, total: 30 },
+  { nim: "210401008", nama: "Hadi Wijaya", semester: 5, progres: 10, total: 30 },
+  { nim: "210401009", nama: "Indah Permata", semester: 5, progres: 22, total: 30 },
+  { nim: "210401010", nama: "Joko Susilo", semester: 5, progres: 14, total: 30 },
+  { nim: "210401011", nama: "Kartika Sari", semester: 5, progres: 19, total: 30 },
+  { nim: "210401012", nama: "Lukman Hakim", semester: 5, progres: 6, total: 30 },
+];
+
 const App = () => {
   // --- Auth & Data State ---
   const [username, setUsername] = useState("");
@@ -294,7 +309,6 @@ const App = () => {
           <SidebarLink active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} icon={<LayoutDashboard size={22} />} label="Beranda" />
           <SidebarLink active={activeTab === 'input'} onClick={() => setActiveTab('input')} icon={<PlusCircle size={22} />} label="Verifikasi Baru" />
           <SidebarLink active={activeTab === 'data'} onClick={() => setActiveTab('data')} icon={<Users size={22} />} label="Mahasiswa Bimbingan" />
-          <SidebarLink active={activeTab === 'riwayat'} onClick={() => setActiveTab('riwayat')} icon={<Clock size={22} />} label="Riwayat Input" />
         </nav>
 
         <div className="p-6 border-t border-slate-50">
@@ -498,6 +512,64 @@ const App = () => {
                   
                   <div className="p-10 bg-slate-50/50 flex justify-center border-t border-slate-50">
                      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Ujung Halaman • Data Sinkron</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'data' && (
+              <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div className="bg-white rounded-[2.5rem] p-10 border border-slate-100 shadow-sm">
+                  <div className="flex items-center justify-between mb-10">
+                    <div>
+                      <h2 className="text-3xl font-black text-slate-900">Mahasiswa Bimbingan</h2>
+                      <p className="text-slate-400 mt-2 font-medium">Dosen Pembimbing: <span className="text-indigo-600 font-black">Pak Fikri</span></p>
+                    </div>
+                    <div className="bg-indigo-50 text-indigo-600 px-6 py-3 rounded-2xl font-black text-sm">
+                      Total: {MAHASISWA_BIMBINGAN.length} Mahasiswa
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                    {MAHASISWA_BIMBINGAN.map((mhs) => {
+                      const percent = Math.round((mhs.progres / mhs.total) * 100);
+                      return (
+                        <div
+                          key={mhs.nim}
+                          className="bg-slate-50 rounded-[2rem] p-6 border border-slate-100 hover:border-indigo-200 hover:shadow-lg hover:shadow-indigo-100/50 transition-all duration-300 group cursor-pointer"
+                          onClick={() => { setNim(mhs.nim); handleGetData(); }}
+                        >
+                          <div className="flex items-start justify-between mb-4">
+                            <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center text-indigo-600 font-black text-xl shadow-sm border border-slate-100 group-hover:scale-110 transition-transform">
+                              {mhs.nama.charAt(0)}
+                            </div>
+                            <span className={`text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest ${percent >= 80 ? 'bg-emerald-100 text-emerald-600' : percent >= 50 ? 'bg-amber-100 text-amber-600' : 'bg-rose-100 text-rose-600'}`}>
+                              {percent >= 80 ? 'Baik' : percent >= 50 ? 'Sedang' : 'Perlu Perhatian'}
+                            </span>
+                          </div>
+
+                          <h3 className="font-black text-lg text-slate-900 mb-1">{mhs.nama}</h3>
+                          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">NIM {mhs.nim} • Semester {mhs.semester}</p>
+
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between text-xs font-bold">
+                              <span className="text-slate-500">Progres Hafalan</span>
+                              <span className="text-indigo-600">{mhs.progres}/{mhs.total}</span>
+                            </div>
+                            <div className="h-3 bg-white rounded-full overflow-hidden border border-slate-100">
+                              <div
+                                className={`h-full rounded-full transition-all duration-500 ${percent >= 80 ? 'bg-emerald-500' : percent >= 50 ? 'bg-amber-500' : 'bg-rose-500'}`}
+                                style={{ width: `${percent}%` }}
+                              />
+                            </div>
+                          </div>
+
+                          <button className="w-full mt-6 bg-white border border-slate-200 text-slate-700 font-bold py-3 rounded-xl hover:bg-indigo-600 hover:text-white hover:border-indigo-600 transition-all text-sm flex items-center justify-center gap-2 group-hover:shadow-md">
+                            Lihat Detail <ArrowRight size={16} />
+                          </button>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
