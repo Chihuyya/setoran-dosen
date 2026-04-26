@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { 
   LayoutDashboard, 
   PlusCircle, 
@@ -12,11 +12,8 @@ import {
   User,
   Trash2,
   Check,
-  ChevronRight,
   ShieldCheck,
-  Settings,
   Bell,
-  MoreVertical,
   BookOpen,
   Filter,
   ArrowRight
@@ -109,61 +106,65 @@ const App = () => {
   // --- Fetch Mahasiswa Bimbingan ---
   const [dosenInfo, setDosenInfo] = useState({ nama: "Pak Fikri", email: "", nip: "" });
 
-  const fetchMahasiswaBimbingan = async () => {
+  const fetchMahasiswaBimbingan = useCallback(() => {
     if (!token) return;
     setLoadingBimbingan(true);
-    try {
-      const res = await api.getMahasiswaBimbingan(token);
-      console.log("[DEBUG] Response dari /dosen/pa-saya:", res);
 
-      let list = null;
+    api.getMahasiswaBimbingan(token)
+      .then((res) => {
+        console.log("[DEBUG] Response dari /dosen/pa-saya:", res);
 
-      // Format API PA-Saya: res.data.info_mahasiswa_pa.daftar_mahasiswa
-      if (res.response === true && res.data?.info_mahasiswa_pa?.daftar_mahasiswa) {
-        list = res.data.info_mahasiswa_pa.daftar_mahasiswa;
-        // Simpan info dosen juga
-        if (res.data.nama) {
-          setDosenInfo({
-            nama: res.data.nama,
-            email: res.data.email || "",
-            nip: res.data.nip || "",
-          });
+        let list = null;
+
+        // Format API PA-Saya: res.data.info_mahasiswa_pa.daftar_mahasiswa
+        if (res.response === true && res.data?.info_mahasiswa_pa?.daftar_mahasiswa) {
+          list = res.data.info_mahasiswa_pa.daftar_mahasiswa;
+          // Simpan info dosen juga
+          if (res.data.nama) {
+            setDosenInfo({
+              nama: res.data.nama,
+              email: res.data.email || "",
+              nip: res.data.nip || "",
+            });
+          }
         }
-      }
-      // Fallbacks untuk format lain
-      else if (Array.isArray(res.data)) {
-        list = res.data;
-      } else if (Array.isArray(res)) {
-        list = res;
-      } else if (res.data?.mahasiswa && Array.isArray(res.data.mahasiswa)) {
-        list = res.data.mahasiswa;
-      } else if (res.data?.list && Array.isArray(res.data.list)) {
-        list = res.data.list;
-      } else if (res.data && typeof res.data === 'object') {
-        const firstArray = Object.values(res.data).find(v => Array.isArray(v));
-        if (firstArray) list = firstArray;
-      }
+        // Fallbacks untuk format lain
+        else if (Array.isArray(res.data)) {
+          list = res.data;
+        } else if (Array.isArray(res)) {
+          list = res;
+        } else if (res.data?.mahasiswa && Array.isArray(res.data.mahasiswa)) {
+          list = res.data.mahasiswa;
+        } else if (res.data?.list && Array.isArray(res.data.list)) {
+          list = res.data.list;
+        } else if (res.data && typeof res.data === 'object') {
+          const firstArray = Object.values(res.data).find(v => Array.isArray(v));
+          if (firstArray) list = firstArray;
+        }
 
-      if (list && Array.isArray(list)) {
-        setMahasiswaBimbingan(list);
-        console.log("[DEBUG] Data mahasiswa bimbingan dimuat:", list.length, "item");
-      } else {
-        console.warn("[DEBUG] Format respons tidak dikenali:", res);
+        if (list && Array.isArray(list)) {
+          setMahasiswaBimbingan(list);
+          console.log("[DEBUG] Data mahasiswa bimbingan dimuat:", list.length, "item");
+        } else {
+          console.warn("[DEBUG] Format respons tidak dikenali:", res);
+          setMahasiswaBimbingan([]);
+        }
+      })
+      .catch((err) => {
+        console.error("[DEBUG] Error fetch mahasiswa bimbingan:", err);
         setMahasiswaBimbingan([]);
-      }
-    } catch (err) {
-      console.error("[DEBUG] Error fetch mahasiswa bimbingan:", err);
-      setMahasiswaBimbingan([]);
-    } finally {
-      setLoadingBimbingan(false);
-    }
-  };
+      })
+      .finally(() => {
+        setLoadingBimbingan(false);
+      });
+  }, [token]);
 
   useEffect(() => {
     if (activeTab === 'data' && token) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       fetchMahasiswaBimbingan();
     }
-  }, [activeTab, token]);
+  }, [activeTab, token, fetchMahasiswaBimbingan]);
 
   // --- Notification Logic ---
   const showNotif = (type, message) => {
@@ -187,7 +188,7 @@ const App = () => {
       setToken(res.access_token);
       showNotif("success", "Selamat datang kembali, Dosen!");
       setActiveTab('dashboard');
-    } catch (err) {
+    } catch {
       showNotif("error", "Login gagal. Cek kembali akun Anda.");
     } finally {
       setIsLoading(false);
@@ -210,7 +211,7 @@ const App = () => {
         setActiveTab('input');
         showNotif("success", `Data ${res.data.info.nama} dimuat.`);
       }
-    } catch (err) {
+    } catch {
       showNotif("error", "Gangguan koneksi ke server.");
     } finally {
       setIsLoading(false);
@@ -246,7 +247,7 @@ const App = () => {
         setSelectedSurah([]);
         setTimeout(() => handleGetData(), 500);
       }
-    } catch (err) {
+    } catch {
       showNotif("error", "Gagal menyimpan data.");
     } finally {
       setIsLoading(false);
@@ -268,7 +269,7 @@ const App = () => {
       const res = await api.deleteSetoran(nim, token, payload);
       showNotif(res.response ? "success" : "error", res.message);
       if (res.response) handleGetData();
-    } catch (err) {
+    } catch {
       showNotif("error", "Gagal menghapus.");
     }
   };
