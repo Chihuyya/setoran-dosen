@@ -627,8 +627,8 @@ const App = () => {
                             <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center text-indigo-600 font-black text-xl shadow-sm border border-slate-100 group-hover:scale-110 transition-transform">
                               {namaMhs.charAt(0)}
                             </div>
-                            <span className={`text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest ${percent >= 80 ? 'bg-emerald-100 text-emerald-600' : percent >= 50 ? 'bg-amber-100 text-amber-600' : 'bg-rose-100 text-rose-600'}`}>
-                              {percent >= 80 ? 'Baik' : percent >= 50 ? 'Sedang' : 'Perlu Perhatian'}
+                            <span className="text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest bg-slate-100 text-slate-500">
+                              {percent}%
                             </span>
                           </div>
 
