@@ -1,4 +1,4 @@
-# TODO: Push setoran-dosen ke GitHub
+
 
 - [x] 1. Inisialisasi repository git baru di folder setoran-dosen
 - [x] 2. Stage & commit seluruh file project

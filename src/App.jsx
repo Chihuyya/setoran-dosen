@@ -87,9 +87,9 @@ const api = {
 
 const App = () => {
   // --- Auth & Data State ---
-  const [username, setUsername] = useState("");
+  const [username, setUsername] = useState(localStorage.getItem('sd_username') || "");
   const [password, setPassword] = useState("");
-  const [token, setToken] = useState("");
+  const [token, setToken] = useState(localStorage.getItem('sd_token') || "");
   const [data, setData] = useState(null);
   const [selectedSurah, setSelectedSurah] = useState([]);
   const [nim, setNim] = useState("");
@@ -99,7 +99,7 @@ const App = () => {
   const notifTimer = useRef(null);
 
   // --- UI State ---
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState(localStorage.getItem('sd_activeTab') || 'dashboard');
   const [isLoading, setIsLoading] = useState(false);
   const [searchFocused, setSearchFocused] = useState(false);
 
@@ -166,6 +166,11 @@ const App = () => {
     }
   }, [activeTab, token, fetchMahasiswaBimbingan]);
 
+  // Persist activeTab changes to localStorage
+  useEffect(() => {
+    localStorage.setItem('sd_activeTab', activeTab);
+  }, [activeTab]);
+
   // --- Notification Logic ---
   const showNotif = (type, message) => {
     if (notifTimer.current) clearTimeout(notifTimer.current);
@@ -185,9 +190,13 @@ const App = () => {
     setIsLoading(true);
     try {
       const res = await api.login(username, password);
-      setToken(res.access_token);
+      const newToken = res.access_token;
+      setToken(newToken);
+      localStorage.setItem('sd_token', newToken);
+      localStorage.setItem('sd_username', username);
       showNotif("success", "Selamat datang kembali, Dosen!");
       setActiveTab('dashboard');
+      localStorage.setItem('sd_activeTab', 'dashboard');
     } catch {
       showNotif("error", "Login gagal. Cek kembali akun Anda.");
     } finally {
@@ -367,7 +376,7 @@ const App = () => {
 
         <div className="p-6 border-t border-slate-50">
           <button 
-            onClick={() => { setToken(""); setData(null); setNim(""); }}
+            onClick={() => { setToken(""); setData(null); setNim(""); localStorage.removeItem('sd_token'); localStorage.removeItem('sd_username'); localStorage.removeItem('sd_activeTab'); }}
             className="flex items-center gap-4 w-full p-4 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-2xl transition-all font-bold text-sm"
           >
             <LogOut size={22} />
