@@ -42,7 +42,10 @@ const api = {
         }),
       }
     );
-    if (!response.ok) throw new Error("Gagal login");
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error_description || "Gagal login");
+    }
     return response.json();
   },
 
@@ -50,6 +53,10 @@ const api = {
     const response = await fetch(`${BASE_URL}/mahasiswa/setoran/${nim}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.message || "Gagal mengambil data");
+    }
     return response.json();
   },
 
@@ -62,6 +69,10 @@ const api = {
       },
       body: JSON.stringify(data),
     });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || "Gagal menyimpan data");
+    }
     return res.json();
   },
 
@@ -74,6 +85,10 @@ const api = {
       },
       body: JSON.stringify(data),
     });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || "Gagal menghapus data");
+    }
     return res.json();
   },
 
@@ -81,9 +96,29 @@ const api = {
     const response = await fetch(`${BASE_URL}/dosen/pa-saya`, {
       headers: { Authorization: `Bearer ${token}` },
     });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.message || "Gagal mengambil bimbingan");
+    }
     return response.json();
   }
 };
+
+// --- Custom Components (Moved to top to prevent "use before define" error) ---
+const SidebarLink = ({ icon, label, active, onClick }) => (
+  <button 
+    onClick={onClick}
+    className={`flex items-center gap-4 w-full p-4 rounded-2xl transition-all duration-300 font-black text-sm group ${
+      active 
+        ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-100 translate-x-1' 
+        : 'text-slate-400 hover:bg-slate-50 hover:text-slate-600'
+    }`}
+  >
+    <span className={`${active ? 'scale-110' : 'group-hover:scale-110'} transition-transform`}>{icon}</span>
+    <span className="hidden lg:block">{label}</span>
+    {active && <div className="ml-auto w-1.5 h-1.5 bg-white rounded-full hidden lg:block"></div>}
+  </button>
+);
 
 const App = () => {
   // --- Auth & Data State ---
@@ -96,6 +131,10 @@ const App = () => {
   const [notif, setNotif] = useState(null);
   const [mahasiswaBimbingan, setMahasiswaBimbingan] = useState([]);
   const [loadingBimbingan, setLoadingBimbingan] = useState(false);
+  
+  // State Progress Hafalan (Hanya untuk Detail)
+  const [progress, setProgress] = useState(0);
+  
   const notifTimer = useRef(null);
 
   // --- UI State ---
@@ -103,8 +142,15 @@ const App = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [searchFocused, setSearchFocused] = useState(false);
 
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (notifTimer.current) clearTimeout(notifTimer.current);
+    };
+  }, []);
+
   // --- Fetch Mahasiswa Bimbingan ---
-  const [dosenInfo, setDosenInfo] = useState({ nama: "Pak Fikri", email: "", nip: "" });
+  const [dosenInfo, setDosenInfo] = useState({ nama: "Dosen PA", email: "", nip: "" });
 
   const fetchMahasiswaBimbingan = useCallback(() => {
     if (!token) return;
@@ -112,14 +158,10 @@ const App = () => {
 
     api.getMahasiswaBimbingan(token)
       .then((res) => {
-        console.log("[DEBUG] Response dari /dosen/pa-saya:", res);
-
         let list = null;
 
-        // Format API PA-Saya: res.data.info_mahasiswa_pa.daftar_mahasiswa
         if (res.response === true && res.data?.info_mahasiswa_pa?.daftar_mahasiswa) {
           list = res.data.info_mahasiswa_pa.daftar_mahasiswa;
-          // Simpan info dosen juga
           if (res.data.nama) {
             setDosenInfo({
               nama: res.data.nama,
@@ -127,31 +169,19 @@ const App = () => {
               nip: res.data.nip || "",
             });
           }
-        }
-        // Fallbacks untuk format lain
-        else if (Array.isArray(res.data)) {
+        } else if (Array.isArray(res.data)) {
           list = res.data;
         } else if (Array.isArray(res)) {
           list = res;
-        } else if (res.data?.mahasiswa && Array.isArray(res.data.mahasiswa)) {
-          list = res.data.mahasiswa;
-        } else if (res.data?.list && Array.isArray(res.data.list)) {
-          list = res.data.list;
-        } else if (res.data && typeof res.data === 'object') {
-          const firstArray = Object.values(res.data).find(v => Array.isArray(v));
-          if (firstArray) list = firstArray;
         }
 
         if (list && Array.isArray(list)) {
           setMahasiswaBimbingan(list);
-          console.log("[DEBUG] Data mahasiswa bimbingan dimuat:", list.length, "item");
         } else {
-          console.warn("[DEBUG] Format respons tidak dikenali:", res);
           setMahasiswaBimbingan([]);
         }
       })
       .catch((err) => {
-        console.error("[DEBUG] Error fetch mahasiswa bimbingan:", err);
         setMahasiswaBimbingan([]);
       })
       .finally(() => {
@@ -161,7 +191,6 @@ const App = () => {
 
   useEffect(() => {
     if (activeTab === 'data' && token) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       fetchMahasiswaBimbingan();
     }
   }, [activeTab, token, fetchMahasiswaBimbingan]);
@@ -170,6 +199,20 @@ const App = () => {
   useEffect(() => {
     localStorage.setItem('sd_activeTab', activeTab);
   }, [activeTab]);
+
+  // --- Logic Perhitungan Progress (Hanya saat data detail dimuat) ---
+  useEffect(() => {
+    if (data && data.setoran && data.setoran.detail) {
+      const list = data.setoran.detail;
+      const total = list.length;
+      // Hitung berdasarkan data yang 'sudah_setor' dari database
+      const selesai = list.filter(item => item.sudah_setor).length;
+      const percent = total > 0 ? Math.round((selesai / total) * 100) : 0;
+      setProgress(percent);
+    } else {
+      setProgress(0);
+    }
+  }, [data]);
 
   // --- Notification Logic ---
   const showNotif = (type, message) => {
@@ -204,19 +247,22 @@ const App = () => {
     }
   };
 
-  const handleGetData = async () => {
-    if (!token || !nim) {
-      showNotif("error", !token ? "Sesi berakhir." : "NIM tidak boleh kosong.");
+  const handleGetData = async (nimOverride) => {
+    // Pastikan nimOverride benar-benar string NIM, bukan object Event
+    const targetNim = (typeof nimOverride === 'string' ? nimOverride : null) || nim;
+    if (!token || !targetNim) {
+      showNotif("error", !token ? "Sesi berakhir." : "NIM mahasiswa harus diisi.");
       return;
     }
     setIsLoading(true);
     try {
-      const res = await api.getSetoran(nim, token);
+      const res = await api.getSetoran(targetNim, token);
       if (!res.response) {
         showNotif("error", res.message || "Mahasiswa tidak ditemukan.");
         setData(null);
       } else {
         setData(res.data);
+        setSelectedSurah([]); // Reset pilihan saat ganti mahasiswa
         setActiveTab('input');
         showNotif("success", `Data ${res.data.info.nama} dimuat.`);
       }
@@ -243,7 +289,7 @@ const App = () => {
     if (!nim || selectedSurah.length === 0) {
       showNotif("error", "Pilih setoran terlebih dahulu!");
       return;
-    };
+    }
     setIsLoading(true);
     const payload = {
       data_setoran: selectedSurah,
@@ -254,7 +300,7 @@ const App = () => {
       showNotif(res.response ? "success" : "error", res.message);
       if (res.response) {
         setSelectedSurah([]);
-        setTimeout(() => handleGetData(), 500);
+        setTimeout(() => handleGetData(nim), 500); // otomatis update data
       }
     } catch {
       showNotif("error", "Gagal menyimpan data.");
@@ -277,7 +323,7 @@ const App = () => {
     try {
       const res = await api.deleteSetoran(nim, token, payload);
       showNotif(res.response ? "success" : "error", res.message);
-      if (res.response) handleGetData();
+      if (res.response) await handleGetData(nim); 
     } catch {
       showNotif("error", "Gagal menghapus.");
     }
@@ -403,7 +449,7 @@ const App = () => {
             />
             {nim && (
               <button 
-                onClick={handleGetData}
+                onClick={() => handleGetData()}
                 disabled={isLoading}
                 className="bg-indigo-600 text-white text-xs font-black px-4 py-2 rounded-xl hover:bg-indigo-700 transition shadow-md active:scale-95"
               >
@@ -414,8 +460,8 @@ const App = () => {
 
           <div className="flex items-center gap-6">
             <div className="flex flex-col items-end hidden sm:flex">
-              <span className="text-sm font-black text-slate-800">{username}</span>
-              <span className="text-[10px] font-bold text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded-full uppercase tracking-widest">Dosen Verifikator</span>
+              <span className="text-sm font-black text-slate-800">{dosenInfo.nama || username}</span>
+              <span className="text-[10px] font-bold text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded-full uppercase tracking-widest">{dosenInfo.nip || "Dosen Verifikator"}</span>
             </div>
             <div className="w-12 h-12 rounded-2xl bg-indigo-50 border-2 border-white shadow-md flex items-center justify-center font-black text-indigo-600 text-lg">
               {username?.charAt(0).toUpperCase()}
@@ -498,6 +544,23 @@ const App = () => {
                     {isLoading ? <Clock className="animate-spin" /> : <CheckCircle2 />}
                     SIMPAN ({selectedSurah.length})
                   </button>
+                </div>
+
+                {/* Progress Bar Card (Ini yang benar jalan karena ambil detail setoran per mahasiswa) */}
+                <div className="bg-white rounded-[2.5rem] p-8 border border-slate-100 shadow-sm flex flex-col gap-4">
+                  <div className="flex justify-between items-end">
+                    <div>
+                      <h3 className="font-black text-xl text-slate-900">Progres Hafalan</h3>
+                      <p className="text-slate-400 text-sm font-medium">Persentase setoran yang sudah diverifikasi</p>
+                    </div>
+                    <div className="text-4xl font-black text-indigo-600">{progress}%</div>
+                  </div>
+                  <div className="h-4 bg-slate-100 rounded-full overflow-hidden border border-slate-50 relative">
+                    <div 
+                      className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-emerald-500 transition-all duration-1000 ease-out"
+                      style={{ width: `${progress}%` }}
+                    />
+                  </div>
                 </div>
 
                 {/* Table/List Card */}
@@ -619,47 +682,37 @@ const App = () => {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                     {mahasiswaBimbingan.map((mhs, idx) => {
-                      // Handle berbagai format field dari API
+                      // KODE BARU: Progress & Bar sudah dihapus dari sini karena API /pa-saya tidak mengirim data tersebut
                       const nimMhs = mhs.nim || mhs.npm || mhs.nim_mhs || mhs.id || idx + 1;
                       const namaMhs = mhs.nama || mhs.nm_mhs || mhs.name || mhs.nama_mahasiswa || "Mahasiswa";
                       const semesterMhs = mhs.semester || mhs.smt || mhs.sem || "-";
-                      const progresMhs = mhs.progres || mhs.jumlah_setoran || mhs.total_setoran || mhs.setoran_count || 0;
-                      const totalMhs = mhs.total || mhs.total_target || mhs.target || 30;
-                      const percent = totalMhs > 0 ? Math.round((progresMhs / totalMhs) * 100) : 0;
                       
                       return (
                         <div
                           key={nimMhs}
-                          className="bg-slate-50 rounded-[2rem] p-6 border border-slate-100 hover:border-indigo-200 hover:shadow-lg hover:shadow-indigo-100/50 transition-all duration-300 group cursor-pointer"
-                          onClick={() => { setNim(String(nimMhs)); handleGetData(); }}
+                          className="bg-slate-50 rounded-[2rem] p-6 border border-slate-100 hover:border-indigo-200 hover:shadow-lg hover:shadow-indigo-100/50 transition-all duration-300 group cursor-pointer flex flex-col justify-between"
+                          onClick={() => { 
+                            const nimStr = String(nimMhs);
+                            setNim(nimStr); 
+                            handleGetData(nimStr); 
+                          }}
                         >
-                          <div className="flex items-start justify-between mb-4">
-                            <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center text-indigo-600 font-black text-xl shadow-sm border border-slate-100 group-hover:scale-110 transition-transform">
-                              {namaMhs.charAt(0)}
+                          <div>
+                            <div className="flex items-start justify-between mb-4">
+                              <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center text-indigo-600 font-black text-xl shadow-sm border border-slate-100 group-hover:scale-110 transition-transform">
+                                {namaMhs.charAt(0)}
+                              </div>
+                              <span className="text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest bg-emerald-100 text-emerald-600 shadow-sm border border-emerald-200">
+                                Aktif
+                              </span>
                             </div>
-                            <span className="text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest bg-slate-100 text-slate-500">
-                              {percent}%
-                            </span>
+
+                            <h3 className="font-black text-lg text-slate-900 mb-1 line-clamp-2">{namaMhs}</h3>
+                            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">NIM {nimMhs} • Sem {semesterMhs}</p>
                           </div>
 
-                          <h3 className="font-black text-lg text-slate-900 mb-1">{namaMhs}</h3>
-                          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">NIM {nimMhs} • Semester {semesterMhs}</p>
-
-                          <div className="space-y-2">
-                            <div className="flex items-center justify-between text-xs font-bold">
-                              <span className="text-slate-500">Progres Hafalan</span>
-                              <span className="text-indigo-600">{progresMhs}/{totalMhs}</span>
-                            </div>
-                            <div className="h-3 bg-white rounded-full overflow-hidden border border-slate-100">
-                              <div
-                                className={`h-full rounded-full transition-all duration-500 ${percent >= 80 ? 'bg-emerald-500' : percent >= 50 ? 'bg-amber-500' : 'bg-rose-500'}`}
-                                style={{ width: `${percent}%` }}
-                              />
-                            </div>
-                          </div>
-
-                          <button className="w-full mt-6 bg-white border border-slate-200 text-slate-700 font-bold py-3 rounded-xl hover:bg-indigo-600 hover:text-white hover:border-indigo-600 transition-all text-sm flex items-center justify-center gap-2 group-hover:shadow-md">
-                            Lihat Detail <ArrowRight size={16} />
+                          <button className="w-full mt-4 bg-white border border-slate-200 text-slate-700 font-bold py-3 rounded-xl hover:bg-indigo-600 hover:text-white hover:border-indigo-600 transition-all text-sm flex items-center justify-center gap-2 group-hover:shadow-md">
+                            Cek Hafalan <ArrowRight size={16} />
                           </button>
                         </div>
                       );
@@ -674,22 +727,5 @@ const App = () => {
     </div>
   );
 };
-
-// --- Custom Components ---
-
-const SidebarLink = ({ icon, label, active, onClick }) => (
-  <button 
-    onClick={onClick}
-    className={`flex items-center gap-4 w-full p-4 rounded-2xl transition-all duration-300 font-black text-sm group ${
-      active 
-        ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-100 translate-x-1' 
-        : 'text-slate-400 hover:bg-slate-50 hover:text-slate-600'
-    }`}
-  >
-    <span className={`${active ? 'scale-110' : 'group-hover:scale-110'} transition-transform`}>{icon}</span>
-    <span className="hidden lg:block">{label}</span>
-    {active && <div className="ml-auto w-1.5 h-1.5 bg-white rounded-full hidden lg:block"></div>}
-  </button>
-);
 
 export default App;
